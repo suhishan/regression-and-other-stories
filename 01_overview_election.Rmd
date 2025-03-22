@@ -1,0 +1,85 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+#### Predicting Presidential Vote Share from the economy.
+
+```{r}
+library(tidyverse)
+library(rstanarm)
+library(here)
+library(brms)
+
+theme_set(theme_linedraw() +
+            theme(panel.grid = element_blank()))
+# Data
+file_hibbs <- here("ros_examples/ElectionsEconomy/data/hibbs.dat")
+
+hibbs <- 
+  file_hibbs %>% 
+  read.table(header = TRUE) %>% 
+  as_tibble()
+
+hibbs
+```
+
+Visualization
+
+```{r}
+hibbs %>% 
+  ggplot(aes(growth, vote)) +
+  geom_hline(yintercept = 50, color = "grey85", size = 1/4)+
+  geom_text(aes(label = year), size = 3)+
+  scale_x_continuous(labels = function(x) str_c(x, "%"))+
+  scale_y_continuous(labels = function(x) str_c(x, "%"))+
+  labs(
+    title = "Election Forecast from the economy",
+    x = "Average Recent growth in personal income",
+    y = "Incumbent party's vote share"
+  )
+
+```
+
+Let's do a regression line fit using brms.
+Let's fit the model using default priors. 
+
+```{r}
+m1.1 <- 
+  brm(data = hibbs, 
+      family = gaussian(),
+      vote ~ 0 + Intercept + growth,
+      cores = 4, chains = 4, 
+      seed = 1,
+      file = "fits/m01.01")
+```
+
+
+
+Making the second figure with the regression line overlayed.
+
+```{r}
+nd <- tibble(
+  growth = seq(-1, 5, length.out = 50)
+)
+
+plot2 <- fitted(m1.1, newdata = nd) %>%# provides a fit for any data you provide which is nice.
+  data.frame() %>% 
+  bind_cols(nd) %>% 
+  mutate(vote = Estimate) %>% 
+  
+  ggplot(aes(x = growth,  y = vote))+
+  geom_hline(yintercept = 50, color = "grey", size = 1/4)+
+  geom_smooth(aes(ymin = Q2.5, ymax = Q97.5),
+              stat = "identity",
+              alpha = 1/5, size = 1/4)+
+  geom_point(data = hibbs)+
+  scale_x_continuous(labels = function(x) str_c(x, "%"))+
+  scale_y_continuous(labels = function(x) str_c(x, "%"))+
+  labs(subtitle = "Data and linear fit",
+       x = "Average recent growth in personal income",
+       y = "Incumbent party's vote share")
+
+plot2  
+```
+
